@@ -139,9 +139,10 @@
       margin: 0;
     }
     .task-row {
-      /* Use a flexible grid: the name takes the available space, the stepper and delete button size to their contents */
+      /* Layout for each task row.  The name field takes up the remaining space, the stepper has a fixed width so the minus, value and plus never get cut off on narrow screens, and the delete button has a smaller fixed width. */
       display: grid;
-      grid-template-columns: 1fr max-content max-content;
+      /* 1fr = name grows; 7rem = space for the stepper (minus, number, plus); 2.5rem = space for the delete button */
+      grid-template-columns: 1fr 7rem 2.5rem;
       align-items: center;
       gap: 0.5rem;
       margin-bottom: 0.5rem;
