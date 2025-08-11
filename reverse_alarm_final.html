@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reverse Alarm – Reverse Labs</title>
+  <!--
+    Final version of the Reverse Alarm app.
+    This version removes task reordering, adds plus/minus steppers for time fields,
+    moves the buffer into the Event Details section, introduces an optional
+    bedtime calculation toggle, and simplifies the UI by removing auto‑calculate
+    and 24‑hour format switches. Everything is contained in this single file
+    to run offline without any external dependencies.
+  -->
+  <style>
+    :root {
+      /* Colour palette */
+      --primary: #0078d4;
+      --primary-dark: #005a9c;
+      --secondary: #f6f8fa;
+      --accent: #ff7a18;
+      --bg: #ffffff;
+      --card-bg: #ffffff;
+      --text-primary: #24292e;
+      --text-secondary: #586069;
+      --border: #e1e4e8;
+      --radius: 0.5rem;
+      --shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1.5rem 1rem;
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      /* Increase the main title size for better readability */
+      font-size: 2.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+    header p {
+      margin-top: 0.25rem;
+      /* Bump up tagline size for clarity */
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+    main {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+      /* Larger section headings */
+      font-size: 1.6rem;
+      color: var(--primary-dark);
+    }
+    .form-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .form-group label {
+      flex: 0 0 150px;
+      font-weight: 500;
+      margin-right: 0.5rem;
+      /* Slightly bigger labels */
+      font-size: 1.1rem;
+    }
+    .form-group input {
+      flex: 1;
+      padding: 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      /* Slightly bigger text inside inputs */
+      font-size: 1.1rem;
+    }
+    /* Stepper for number inputs */
+    .stepper {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .stepper button {
+      background: var(--secondary);
+      border: none;
+      color: var(--primary-dark);
+      /* Wider buttons for better tap targets */
+      width: 2.5rem;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+    .stepper button:hover {
+      background: #eef1f5;
+    }
+    .stepper input {
+      flex: 1;
+      text-align: center;
+      border: none;
+      padding: 0.6rem;
+      /* Slightly bigger text inside steppers */
+      font-size: 1.1rem;
+    }
+    .tasks-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .task-row {
+      /* Use a flexible grid: the name takes the available space, the stepper and delete button size to their contents */
+      display: grid;
+      grid-template-columns: 1fr max-content max-content;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    /* Text input for task name takes all available width */
+    .task-row input[type="text"] {
+      width: 100%;
+      padding: 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1.1rem;
+    }
+    /* Let the numeric stepper size itself based on its content */
+    .task-row .stepper {
+      width: auto;
+    }
+    /* Delete button sizes itself based on its content */
+    .task-row button {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 1.3rem;
+      cursor: pointer;
+      width: auto;
+      padding: 0 0.5rem;
+      text-align: center;
+    }
+    .task-row button:hover {
+      color: var(--primary-dark);
+    }
+
+    /* No duplicate style: the task row stepper sizing is defined above */
+
+    /* Style for the icon in the title */
+    header .icon {
+      font-size: 1.4em;
+    }
+    .add-task {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.9rem;
+      color: var(--primary);
+      cursor: pointer;
+      border: none;
+      background: none;
+      margin-top: 0.5rem;
+    }
+    .add-task:hover {
+      color: var(--primary-dark);
+    }
+
+    /* Prevent long labels from wrapping onto multiple lines */
+    .nowrap {
+      white-space: nowrap;
+    }
+    .buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .buttons button {
+      flex: 1;
+      padding: 0.8rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    .btn-calc {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-reset {
+      background: #f3f4f6;
+      color: var(--text-primary);
+    }
+    .results {
+      margin-top: 1rem;
+      display: none;
+    }
+    .timeline {
+      /* The timeline now contains two rows: top and bottom */
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .timeline-row {
+      display: grid;
+      gap: 1rem;
+    }
+    /* Top row holds two items (bedtime start and go to bed) */
+    #timelineTop {
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+    /* Bottom row auto fits the remaining items */
+    #timelineBottom {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+    .time-box {
+      background: var(--secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .time-box h3 {
+      margin: 0;
+      /* Larger label under icons */
+      font-size: 1rem;
+      color: var(--text-secondary);
+    }
+    .time-box p {
+      margin: 0.4rem 0 0;
+      /* Increase main times */
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+    }
+    .breakdown {
+      margin-top: 1rem;
+    }
+    .breakdown ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .breakdown li {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid var(--border);
+      /* Bigger breakdown text */
+      font-size: 1rem;
+    }
+    .breakdown li:last-child {
+      border-bottom: none;
+    }
+    .banner {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.8rem 1rem;
+      border-radius: var(--radius);
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    /* Timeline styling: different colours and emoji support */
+    .emoji {
+      margin-right: 0.25rem;
+    }
+    .time-bedtime-start {
+      background: #f3e5f5;
+    }
+    .time-bedtime-go {
+      background: #e3f2fd;
+    }
+    .time-wake {
+      background: #fff9c4;
+    }
+    .time-leave {
+      background: #e8f5e9;
+    }
+    .time-arrive {
+      background: #fff3e0;
+    }
+    .time-event {
+      background: #f5f5f5;
+    }
+    @media (max-width: 480px) {
+      .form-group label {
+        flex: 0 0 100%;
+        margin-bottom: 0.25rem;
+      }
+      .stepper button {
+        width: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <!-- Use an alarm clock emoji to emphasise the purpose -->
+    <h1><span class="icon">⏰</span> Reverse Alarm</h1>
+    <!-- Tagline emphasises both wake‑up and bedtime planning -->
+    <p>Reverse‑Engineer your perfect wake‑up time and bedtime</p>
+  </header>
+  <main>
+    <!-- Event details card -->
+    <div class="card" id="detailsCard">
+      <h2>Event Details</h2>
+      <div class="form-group">
+        <label for="eventTime">Event Time</label>
+        <input type="time" id="eventTime" required>
+      </div>
+      <div class="form-group">
+        <label for="travelTime">Travel Time (min)</label>
+        <div class="stepper" id="travelStepper">
+          <button type="button" aria-label="Decrease travel time">−</button>
+          <input type="number" id="travelTime" min="0" step="1" value="30">
+          <button type="button" aria-label="Increase travel time">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="arriveEarly">Arrive Early (min)</label>
+        <div class="stepper" id="arriveStepper">
+          <button type="button" aria-label="Decrease arrive early">−</button>
+          <input type="number" id="arriveEarly" min="0" step="1" value="10">
+          <button type="button" aria-label="Increase arrive early">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="buffer">Buffer (min)</label>
+        <div class="stepper" id="bufferStepper">
+          <button type="button" aria-label="Decrease buffer">−</button>
+          <input type="number" id="buffer" min="0" step="1" value="15">
+          <button type="button" aria-label="Increase buffer">+</button>
+        </div>
+      </div>
+    </div>
+    <!-- Morning routine card -->
+    <div class="card" id="tasksCard">
+      <h2>Morning Routine</h2>
+      <ul id="tasksList" class="tasks-list"></ul>
+      <button type="button" class="add-task" id="addTaskBtn">+ Add Task</button>
+    </div>
+    <!-- Bedtime settings -->
+    <div class="card" id="bedtimeCard">
+      <h2>Bedtime Settings</h2>
+      <div class="form-group">
+        <!-- The label text stays on a single line -->
+        <label class="nowrap"><input type="checkbox" id="calcBedtime"> Do you also want to calculate what time to go to sleep?</label>
+      </div>
+      <div id="bedtimeFields" style="display:none;">
+        <div class="form-group">
+          <label for="sleepHours">Desired Sleep (hrs)</label>
+          <div class="stepper" id="sleepStepper">
+            <button type="button" aria-label="Decrease sleep hours">−</button>
+            <input type="number" id="sleepHours" min="0" max="24" step="0.5" value="8">
+            <button type="button" aria-label="Increase sleep hours">+</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="bedtimeRoutine">Bedtime Routine (min)</label>
+          <div class="stepper" id="bedtimeRoutineStepper">
+            <button type="button" aria-label="Decrease bedtime routine">−</button>
+            <input type="number" id="bedtimeRoutine" min="0" step="1" value="30">
+            <button type="button" aria-label="Increase bedtime routine">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Action buttons -->
+    <div class="buttons">
+      <button type="button" class="btn-calc" id="calcBtn">Calculate</button>
+      <button type="button" class="btn-reset" id="resetBtn">Reset</button>
+    </div>
+    <!-- Results card -->
+    <div id="resultsCard" class="card results">
+      <div id="banner" class="banner"></div>
+      <div class="timeline">
+        <div id="timelineTop" class="timeline-row"></div>
+        <div id="timelineBottom" class="timeline-row"></div>
+      </div>
+      <div class="breakdown">
+        <ul id="breakdownList"></ul>
+      </div>
+    </div>
+  </main>
+  <script>
+    // Reverse Alarm script with optional bedtime calculation and steppers
+    // Configuration for timeline items: assign emoji and colour class
+    const labelConfig = {
+      'Start Bedtime Routine': { emoji: '🛌', class: 'time-bedtime-start' },
+      'Go to Bed By': { emoji: '💤', class: 'time-bedtime-go' },
+      'Wake Up': { emoji: '🌅', class: 'time-wake' },
+      'Leave By': { emoji: '🚗', class: 'time-leave' },
+      'Arrive By': { emoji: '🚪', class: 'time-arrive' },
+      'Event': { emoji: '📅', class: 'time-event' }
+    };
+    // Default tasks to preload
+    const defaultTasks = [
+      { name: 'Shower', minutes: 20 },
+      { name: 'Skincare & Makeup', minutes: 30 },
+      { name: 'Do Hair', minutes: 25 },
+      { name: 'Get Dressed', minutes: 15 },
+      { name: 'Breakfast / Coffee', minutes: 20 }
+    ];
+    // DOM references
+    const tasksList = document.getElementById('tasksList');
+    const addTaskBtn = document.getElementById('addTaskBtn');
+    const eventTimeInput = document.getElementById('eventTime');
+    const travelTimeInput = document.getElementById('travelTime');
+    const arriveEarlyInput = document.getElementById('arriveEarly');
+    const bufferInput = document.getElementById('buffer');
+    const sleepHoursInput = document.getElementById('sleepHours');
+    const bedtimeRoutineInput = document.getElementById('bedtimeRoutine');
+    const calcBedtimeCheckbox = document.getElementById('calcBedtime');
+    const bedtimeFields = document.getElementById('bedtimeFields');
+    const banner = document.getElementById('banner');
+    const breakdownList = document.getElementById('breakdownList');
+    const resultsCard = document.getElementById('resultsCard');
+
+    // Timeline rows for top and bottom
+    const timelineTop = document.getElementById('timelineTop');
+    const timelineBottom = document.getElementById('timelineBottom');
+
+    // Stepper handlers for travel and arrive early
+    document.querySelector('#travelStepper button[aria-label="Decrease travel time"]').addEventListener('click', () => {
+      const val = parseInt(travelTimeInput.value || '0', 10);
+      travelTimeInput.value = Math.max(0, val - 5);
+    });
+    document.querySelector('#travelStepper button[aria-label="Increase travel time"]').addEventListener('click', () => {
+      const val = parseInt(travelTimeInput.value || '0', 10);
+      travelTimeInput.value = val + 5;
+    });
+    document.querySelector('#arriveStepper button[aria-label="Decrease arrive early"]').addEventListener('click', () => {
+      const val = parseInt(arriveEarlyInput.value || '0', 10);
+      arriveEarlyInput.value = Math.max(0, val - 5);
+    });
+    document.querySelector('#arriveStepper button[aria-label="Increase arrive early"]').addEventListener('click', () => {
+      const val = parseInt(arriveEarlyInput.value || '0', 10);
+      arriveEarlyInput.value = val + 5;
+    });
+
+    // Buffer stepper events
+    document.querySelector('#bufferStepper button[aria-label="Decrease buffer"]').addEventListener('click', () => {
+      const val = parseInt(bufferInput.value || '0', 10);
+      bufferInput.value = Math.max(0, val - 5);
+    });
+    document.querySelector('#bufferStepper button[aria-label="Increase buffer"]').addEventListener('click', () => {
+      const val = parseInt(bufferInput.value || '0', 10);
+      bufferInput.value = val + 5;
+    });
+    // Sleep hours stepper events
+    document.querySelector('#sleepStepper button[aria-label="Decrease sleep hours"]').addEventListener('click', () => {
+      const val = parseFloat(sleepHoursInput.value || '0');
+      sleepHoursInput.value = Math.max(0, (val - 0.5).toFixed(1));
+    });
+    document.querySelector('#sleepStepper button[aria-label="Increase sleep hours"]').addEventListener('click', () => {
+      const val = parseFloat(sleepHoursInput.value || '0');
+      sleepHoursInput.value = (val + 0.5).toFixed(1);
+    });
+    // Bedtime routine stepper events
+    document.querySelector('#bedtimeRoutineStepper button[aria-label="Decrease bedtime routine"]').addEventListener('click', () => {
+      const val = parseInt(bedtimeRoutineInput.value || '0', 10);
+      bedtimeRoutineInput.value = Math.max(0, val - 5);
+    });
+    document.querySelector('#bedtimeRoutineStepper button[aria-label="Increase bedtime routine"]').addEventListener('click', () => {
+      const val = parseInt(bedtimeRoutineInput.value || '0', 10);
+      bedtimeRoutineInput.value = val + 5;
+    });
+
+    // Toggle bedtime fields
+    calcBedtimeCheckbox.addEventListener('change', () => {
+      bedtimeFields.style.display = calcBedtimeCheckbox.checked ? 'block' : 'none';
+    });
+
+    // Create a task row with plus/minus controls for minutes
+    function createTaskRow(name = '', minutes = 0) {
+      const li = document.createElement('li');
+      li.className = 'task-row';
+      // Name input
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Task name';
+      nameInput.value = name;
+      // Stepper container for minutes
+      const stepper = document.createElement('div');
+      stepper.className = 'stepper';
+      const minusBtn = document.createElement('button');
+      minusBtn.innerHTML = '−';
+      minusBtn.title = 'Decrease by 5 minutes';
+      const minutesInput = document.createElement('input');
+      minutesInput.type = 'number';
+      minutesInput.min = '0';
+      minutesInput.step = '1';
+      minutesInput.value = minutes;
+      const plusBtn = document.createElement('button');
+      plusBtn.innerHTML = '+';
+      plusBtn.title = 'Increase by 5 minutes';
+      stepper.appendChild(minusBtn);
+      stepper.appendChild(minutesInput);
+      stepper.appendChild(plusBtn);
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.innerHTML = '✕';
+      deleteBtn.title = 'Delete task';
+      // Event listeners for stepper
+      minusBtn.addEventListener('click', () => {
+        const val = parseInt(minutesInput.value || '0', 10);
+        minutesInput.value = Math.max(0, val - 5);
+      });
+      plusBtn.addEventListener('click', () => {
+        const val = parseInt(minutesInput.value || '0', 10);
+        minutesInput.value = val + 5;
+      });
+      deleteBtn.addEventListener('click', () => {
+        li.remove();
+      });
+      // Assemble row
+      li.appendChild(nameInput);
+      li.appendChild(stepper);
+      li.appendChild(deleteBtn);
+      return li;
+    }
+    function loadDefaultTasks() {
+      tasksList.innerHTML = '';
+      defaultTasks.forEach(t => {
+        tasksList.appendChild(createTaskRow(t.name, t.minutes));
+      });
+    }
+    // Format Date into 12‑hour time with previous/next day indicators
+    function formatTime(date) {
+      const opts = { hour: 'numeric', minute: '2-digit' };
+      // Simply format without adding Prev or Next prefixes
+      return date.toLocaleTimeString([], opts);
+    }
+    // Main calculation
+    function calculate() {
+      const eventTimeStr = eventTimeInput.value;
+      if (!eventTimeStr) {
+        resultsCard.style.display = 'none';
+        return;
+      }
+      const travelMin = parseInt(travelTimeInput.value, 10) || 0;
+      const arriveEarlyMin = parseInt(arriveEarlyInput.value, 10) || 0;
+      const bufferMin = parseInt(bufferInput.value, 10) || 0;
+      const now = new Date();
+      const [h, m] = eventTimeStr.split(':').map(Number);
+      const eventDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+      function minus(date, minutes) {
+        return new Date(date.getTime() - minutes * 60000);
+      }
+      const arrival = minus(eventDate, arriveEarlyMin);
+      const leaveBy = minus(arrival, travelMin);
+      // Sum morning prep
+      let prepTotal = 0;
+      const taskRows = tasksList.querySelectorAll('.task-row');
+      taskRows.forEach(row => {
+        const minutesVal = parseInt(row.querySelector('input[type="number"]').value, 10);
+        if (!isNaN(minutesVal)) prepTotal += minutesVal;
+      });
+      const wakeUp = minus(leaveBy, prepTotal + bufferMin);
+      // Bedtime
+      const includeBedtime = calcBedtimeCheckbox.checked;
+      let goToBed, startBedtime;
+      let sleepHrs = 0;
+      let bedtimeRoutineMin = 0;
+      if (includeBedtime) {
+        sleepHrs = parseFloat(sleepHoursInput.value) || 0;
+        bedtimeRoutineMin = parseInt(bedtimeRoutineInput.value, 10) || 0;
+        goToBed = minus(wakeUp, sleepHrs * 60);
+        startBedtime = minus(goToBed, bedtimeRoutineMin);
+      }
+      // Build timeline array
+      const timelineItems = [];
+      if (includeBedtime) {
+        timelineItems.push({ label: 'Start Bedtime Routine', time: startBedtime });
+        timelineItems.push({ label: 'Go to Bed By', time: goToBed });
+      }
+      timelineItems.push({ label: 'Wake Up', time: wakeUp });
+      timelineItems.push({ label: 'Leave By', time: leaveBy });
+      timelineItems.push({ label: 'Arrive By', time: arrival });
+      timelineItems.push({ label: 'Event', time: eventDate });
+      // Update UI
+      banner.textContent = 'Leave by: ' + formatTime(leaveBy);
+      // Clear previous timeline rows
+      timelineTop.innerHTML = '';
+      timelineBottom.innerHTML = '';
+      // Helper to create a timeline box with colour and emoji
+      function createTimelineBox(label, time) {
+        const box = document.createElement('div');
+        box.className = 'time-box';
+        const cfg = labelConfig[label] || {};
+        if (cfg.class) box.classList.add(cfg.class);
+        const hEl = document.createElement('h3');
+        if (cfg.emoji) {
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'emoji';
+          iconSpan.textContent = cfg.emoji;
+          hEl.appendChild(iconSpan);
+        }
+        hEl.appendChild(document.createTextNode(label));
+        const pEl = document.createElement('p');
+        pEl.textContent = formatTime(time);
+        box.appendChild(hEl);
+        box.appendChild(pEl);
+        return box;
+      }
+      // Populate timeline rows
+      if (includeBedtime) {
+        timelineTop.appendChild(createTimelineBox('Start Bedtime Routine', startBedtime));
+        timelineTop.appendChild(createTimelineBox('Go to Bed By', goToBed));
+      }
+      // Other items always go to bottom row
+      const otherItems = [];
+      otherItems.push({ label: 'Wake Up', time: wakeUp });
+      otherItems.push({ label: 'Leave By', time: leaveBy });
+      otherItems.push({ label: 'Arrive By', time: arrival });
+      otherItems.push({ label: 'Event', time: eventDate });
+      otherItems.forEach(it => {
+        timelineBottom.appendChild(createTimelineBox(it.label, it.time));
+      });
+      breakdownList.innerHTML = '';
+      function addBreakdown(label, val) {
+        const li = document.createElement('li');
+        const spanLabel = document.createElement('span');
+        spanLabel.textContent = label;
+        const spanVal = document.createElement('span');
+        spanVal.textContent = val;
+        li.appendChild(spanLabel);
+        li.appendChild(spanVal);
+        breakdownList.appendChild(li);
+      }
+      addBreakdown('Arrive Early', arriveEarlyMin + ' min');
+      addBreakdown('Travel', travelMin + ' min');
+      addBreakdown('Morning Prep', prepTotal + ' min');
+      addBreakdown('Buffer', bufferMin + ' min');
+      if (includeBedtime) {
+        addBreakdown('Bedtime Routine', bedtimeRoutineMin + ' min');
+        addBreakdown('Sleep', sleepHrs + ' hrs');
+      }
+      resultsCard.style.display = 'block';
+    }
+    // Event handlers
+    addTaskBtn.addEventListener('click', () => {
+      tasksList.appendChild(createTaskRow());
+    });
+    document.getElementById('calcBtn').addEventListener('click', calculate);
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      eventTimeInput.value = '';
+      travelTimeInput.value = '30';
+      arriveEarlyInput.value = '10';
+      bufferInput.value = '15';
+      calcBedtimeCheckbox.checked = false;
+      bedtimeFields.style.display = 'none';
+      sleepHoursInput.value = '8';
+      bedtimeRoutineInput.value = '30';
+      loadDefaultTasks();
+      resultsCard.style.display = 'none';
+    });
+    // Load defaults on init
+    loadDefaultTasks();
+  </script>
+</body>
+</html>
