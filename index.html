@@ -139,51 +139,52 @@
       margin: 0;
     }
     .task-row {
-      /* Each task row uses a flexible grid. The name stretches, the stepper has a fixed width
-         sized to fit its three elements (minus, number, plus), and the delete button has a fixed
-         width. On narrow screens this prevents the time controls from being cut off. */
-      display: grid;
-      /* 1fr = name grows; 6.5rem = space for the stepper; 2.5rem = space for the delete button */
-      grid-template-columns: 1fr 6.5rem 2.5rem;
+      /* Each task row uses a flexible flexbox layout rather than a grid. The task name
+         grows to fill available space, while the stepper and delete button have
+         fixed widths. Using flex prevents truncation on narrow screens and
+         gracefully wraps content if needed. */
+      display: flex;
       align-items: center;
       gap: 0.5rem;
       margin-bottom: 0.5rem;
     }
 
-    /* Constrain the numeric input and buttons inside each task's stepper. Use smaller widths
-       so the entire control fits within the 6.5rem container. */
+    /* Stepper inside a task row: fixed basis and flex-shrink 0 so it doesn't collapse.
+       We choose 6.5rem here which is enough to fit a minus button, a number and a plus button. */
+    .task-row .stepper {
+      flex: 0 0 6.5rem;
+      display: flex;
+      align-items: stretch;
+      overflow: hidden;
+    }
+    /* Buttons inside the task row stepper: slightly smaller for mobile */
     .task-row .stepper button {
       width: 2rem;
       font-size: 1.3rem;
     }
+    /* Numeric input inside the stepper: narrow but readable */
     .task-row .stepper input[type="number"] {
       width: 2.5rem;
       text-align: center;
       font-size: 1.1rem;
     }
-    /* Text input for task name takes all available width */
+    /* Task name input stretches to fill remaining space */
     .task-row input[type="text"] {
-      width: 100%;
+      flex: 1 1 auto;
       padding: 0.7rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       font-size: 1.1rem;
     }
-    /* Ensure the stepper occupies its fixed width */
-    .task-row .stepper {
-      width: 100%;
-      display: flex;
-      align-items: stretch;
-    }
-    /* Delete button sizes itself based on its content */
+    /* Delete button: fixed size, placed at the end */
     .task-row button {
       background: none;
       border: none;
       color: var(--primary);
       font-size: 1.3rem;
       cursor: pointer;
-      width: auto;
-      padding: 0 0.5rem;
+      width: 2.5rem;
+      padding: 0;
       text-align: center;
     }
     .task-row button:hover {
