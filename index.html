@@ -139,53 +139,55 @@
       margin: 0;
     }
     .task-row {
-      /* Each task row uses a flexible flexbox layout rather than a grid. The task name
-         grows to fill available space, while the stepper and delete button have
-         fixed widths. Using flex prevents truncation on narrow screens and
-         gracefully wraps content if needed. */
-      display: flex;
+      /* Layout for each task row.  The name field takes up the remaining space, the stepper has a fixed width so the minus, value and plus never get cut off on narrow screens, and the delete button has a smaller fixed width. */
+      display: grid;
+      /* 1fr = name grows; 8rem = space for the stepper (minus, number, plus); 2.5rem = space for the delete button */
+      grid-template-columns: 1fr 8rem 2.5rem;
       align-items: center;
       gap: 0.5rem;
       margin-bottom: 0.5rem;
     }
 
-    /* Stepper inside a task row: fixed basis and flex-shrink 0 so it doesn't collapse.
-       We choose 6.5rem here which is enough to fit a minus button, a number and a plus button. */
-    .task-row .stepper {
-      flex: 0 0 6.5rem;
-      display: flex;
-      align-items: stretch;
-      overflow: hidden;
-    }
-    /* Buttons inside the task row stepper: slightly smaller for mobile */
-    .task-row .stepper button {
-      width: 2rem;
-      font-size: 1.3rem;
-    }
-    /* Numeric input inside the stepper: narrow but readable */
-    .task-row .stepper input[type="number"] {
-      /* Slightly wider to accommodate two‑digit values like 15 or 30 */
-      width: 3rem;
-      text-align: center;
-      font-size: 1.1rem;
-    }
-    /* Task name input stretches to fill remaining space */
+    /* Previously constrained the numeric input; this rule is now handled below */
+    /* Text input for task name takes all available width */
     .task-row input[type="text"] {
-      flex: 1 1 auto;
+      width: 100%;
       padding: 0.7rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       font-size: 1.1rem;
     }
-    /* Delete button: fixed size, placed at the end */
+    /* Stepper inside a task row: give it a fixed basis so it never collapses on narrow screens.  We use
+       8rem which comfortably fits a minus button, a two‑digit number and a plus button without cutting off
+       any of the elements. */
+    .task-row .stepper {
+      flex: 0 0 8rem;
+      display: flex;
+      align-items: stretch;
+      overflow: hidden;
+    }
+    /* Buttons inside the task row stepper: fixed width for minus and plus buttons */
+    .task-row .stepper button {
+      width: 2rem;
+      font-size: 1.3rem;
+    }
+
+    /* Numeric input inside the task row stepper: wide enough for two‑digit values */
+    .task-row .stepper input[type="number"] {
+      width: 4rem;
+      text-align: center;
+      font-size: 1.1rem;
+    }
+
+    /* Delete button sizes itself based on its content */
     .task-row button {
       background: none;
       border: none;
       color: var(--primary);
       font-size: 1.3rem;
       cursor: pointer;
-      width: 2.5rem;
-      padding: 0;
+      width: auto;
+      padding: 0 0.5rem;
       text-align: center;
     }
     .task-row button:hover {
